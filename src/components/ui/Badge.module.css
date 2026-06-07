@@ -1,0 +1,13 @@
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-family: var(--font-mono);
+  letter-spacing: .02em;
+}
+.ok      { background: rgba(52,199,123,.15); color: var(--success); }
+.falta   { background: rgba(232,69,90,.15);  color: var(--danger);  }
+.dudoso  { background: rgba(240,168,50,.15); color: var(--warn);    }
+.neutral { background: var(--surface2);      color: var(--ink3);    }

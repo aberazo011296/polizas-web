@@ -1,0 +1,17 @@
+.wrapper {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+.canvas {
+  display: block;
+  box-shadow: 0 2px 20px rgba(0,0,0,.5);
+}
+.error {
+  padding: 16px;
+  color: var(--danger);
+  background: rgba(232,69,90,.08);
+  border: 1px solid rgba(232,69,90,.2);
+  border-radius: var(--radius);
+  font-size: 13px;
+}

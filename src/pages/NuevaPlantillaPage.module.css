@@ -1,0 +1,216 @@
+.page { max-width: 1100px; }
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+.title {
+  font-family: var(--font-serif);
+  font-size: 36px;
+  letter-spacing: -.02em;
+  margin-bottom: 4px;
+}
+.sub { font-size: 13px; color: var(--ink2); }
+
+/* Step indicator */
+.steps { display: flex; gap: 8px; align-items: center; }
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.stepActive { color: var(--accent); border-color: var(--accent); background: rgba(79,124,255,.08); }
+.stepDone   { color: var(--success); border-color: rgba(52,199,123,.3); background: rgba(52,199,123,.08); }
+.stepNum {
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: currentColor;
+  color: var(--bg);
+  font-size: 10px;
+  font-weight: 700;
+}
+.stepLabel { font-size: 12px; }
+
+/* Dropzone */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 320px;
+  border: 2px dashed var(--border2);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.dropzone:hover, .dropzoneOver {
+  border-color: var(--accent);
+  background: rgba(79,124,255,.04);
+}
+.dropIcon { font-size: 36px; color: var(--ink3); }
+.dropText { font-size: 16px; font-weight: 500; color: var(--ink2); }
+.dropSub  { font-size: 13px; color: var(--ink3); }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+
+/* Editor layout */
+.editorLayout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.editorSide {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: sticky;
+  top: 0;
+}
+
+.sideSection { display: flex; flex-direction: column; gap: 8px; }
+.sideLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink3);
+}
+
+.paginator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+}
+.pageBtn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--ink2);
+  width: 28px; height: 28px;
+  border-radius: var(--radius);
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color .12s;
+}
+.pageBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.pageBtn:disabled { opacity: .3; }
+
+.cajaList { display: flex; flex-direction: column; gap: 4px; }
+.cajaEmpty { font-size: 12px; color: var(--ink3); }
+.cajaItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.cajaNum {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink3);
+  width: 14px;
+  text-align: center;
+}
+.cajaNombre {
+  flex: 1;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cajaPag { font-size: 10px; color: var(--ink3); font-family: var(--font-mono); }
+
+.sideActions { display: flex; justify-content: space-between; gap: 8px; }
+
+/* Canvas */
+.canvasArea { flex: 1; overflow: auto; }
+.pdfStack { position: relative; display: inline-block; }
+.konvaOverlay {
+  position: absolute;
+  top: 0; left: 0;
+  pointer-events: auto;
+}
+.hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--ink3);
+  text-align: center;
+}
+
+/* Form step */
+.formStep {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.formCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.formTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: -4px;
+}
+.formLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink2);
+}
+.formInput { width: 100%; }
+.formSummary {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.summaryLabel { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink3); }
+.summaryValue { font-size: 28px; font-family: var(--font-serif); color: var(--accent); }
+
+.cajaListSmall { display: flex; flex-wrap: wrap; gap: 6px; }
+.cajaChip {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 11px;
+}
+.cajaChip code { color: var(--accent); font-family: var(--font-mono); }
+.cajaChip span { color: var(--ink3); }
+
+.formActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
