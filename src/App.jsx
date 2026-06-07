@@ -14,6 +14,7 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/plantillas" element={<PlantillasPage />} />
           <Route path="/plantillas/nueva" element={<NuevaPlantillaPage />} />
+          <Route path="/plantillas/editar" element={<NuevaPlantillaPage />} />
           <Route path="/procesar" element={<ProcesarPage />} />
         </Routes>
       </Layout>

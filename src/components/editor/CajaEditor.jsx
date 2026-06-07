@@ -16,6 +16,19 @@ export default function CajaEditor({ width, height, cajas, onChange }) {
   const [seleccionado, setSeleccionado] = useState(null)
   const stageRef = useRef(null)
 
+  // Limpiar selección si la caja seleccionada ya no existe en las cajas actuales
+  useEffect(() => {
+    if (seleccionado && !cajas.find(c => c.id === seleccionado)) {
+      setSeleccionado(null)
+    }
+  }, [cajas, seleccionado])
+
+  useEffect(() => {
+    if (seleccionado && !cajas.find(c => c.id === seleccionado)) {
+      setSeleccionado(null)
+    }
+  }, [cajas])
+
   function getPos(e) {
     const stage = stageRef.current
     const pos = stage.getPointerPosition()
@@ -126,7 +139,7 @@ export default function CajaEditor({ width, height, cajas, onChange }) {
       </Stage>
 
       {/* Panel lateral de cajas */}
-      {seleccionado && (
+      {seleccionado && cajas.find(c => c.id === seleccionado) && (
         <CajaSidePanel
           caja={cajas.find(c => c.id === seleccionado)}
           onUpdate={(campo, valor) => {

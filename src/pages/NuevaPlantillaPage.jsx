@@ -1,18 +1,23 @@
-import { useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { inspeccionarPDF, crearPlantilla } from '../services/api'
+import { useState, useCallback, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { inspeccionarPDF, crearPlantilla, actualizarPlantilla, obtenerPlantilla, subirTemplatePlantilla } from '../services/api'
 import PdfViewer from '../components/editor/PdfViewer'
 import CajaEditor from '../components/editor/CajaEditor'
 import Button from '../components/ui/Button'
 import { useToast } from '../components/ui/Toast'
 import styles from './NuevaPlantillaPage.module.css'
 
-const STEPS = ['Subir PDF', 'Dibujar campos', 'Guardar']
+const STEPS = ['Subir PDF', 'Dibujar campos', 'Datos', 'Template .docx']
 
 export default function NuevaPlantillaPage() {
   const [step, setStep] = useState(0)
   const navigate = useNavigate()
+  const location = useLocation()
   const { show } = useToast()
+
+  // Modo edición: viene con plantillaId en el state del router
+  const plantillaId = location.state?.plantillaId || null
+  const modoEdicion = !!plantillaId
 
   // Step 0
   const [archivo, setArchivo] = useState(null)
@@ -21,13 +26,40 @@ export default function NuevaPlantillaPage() {
   // Step 1
   const [paginaActual, setPaginaActual] = useState(0)
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 })
-  const [cajasPorPagina, setCajasPorPagina] = useState({}) // { [pageIdx]: Caja[] }
+  const [cajasPorPagina, setCajasPorPagina] = useState({})
+
+  const handlePageSize = useCallback((size) => {
+    if (size.width > 0 && size.height > 0) setPageSize(size)
+  }, [])
 
   // Step 2
   const [nombre, setNombre] = useState('')
   const [aseguradora, setAseguradora] = useState('generali')
   const [tipoPoliza, setTipoPoliza] = useState('desgravamen')
   const [guardando, setGuardando] = useState(false)
+
+  // Step 3
+  const [templateDocx, setTemplateDocx] = useState(null)
+
+  // Cargar datos existentes en modo edición
+  useEffect(() => {
+    if (!plantillaId) return
+    obtenerPlantilla(plantillaId)
+      .then(p => {
+        setNombre(p.nombre)
+        setAseguradora(p.aseguradora)
+        setTipoPoliza(p.tipo_poliza)
+        // Agrupar cajas por página y asignarles id temporal
+        const porPagina = {}
+        p.cajas.forEach((c, i) => {
+          const pagina = c.pagina ?? 0
+          if (!porPagina[pagina]) porPagina[pagina] = []
+          porPagina[pagina].push({ ...c, id: Date.now() + i })
+        })
+        setCajasPorPagina(porPagina)
+      })
+      .catch(e => show(`Error cargando plantilla: ${e.message}`, 'error'))
+  }, [plantillaId])
 
   // ── Step 0: drop / select PDF ──────────────────────────────────────────
   function onDrop(e) {
@@ -62,6 +94,13 @@ export default function NuevaPlantillaPage() {
     return Object.values(cajasPorPagina).flat()
   }
 
+  function eliminarCajaPorId(id, pagina) {
+    setCajasPorPagina(prev => ({
+      ...prev,
+      [pagina]: (prev[pagina] || []).filter(c => c.id !== id)
+    }))
+  }
+
   function validarCajas() {
     const cajas = todasLasCajas()
     if (cajas.length === 0) return 'Dibuja al menos un campo'
@@ -78,9 +117,19 @@ export default function NuevaPlantillaPage() {
     setStep(2)
   }
 
-  // ── Step 2: guardar ────────────────────────────────────────────────────
-  async function guardar() {
+  // ── Step 2: validar datos y continuar ─────────────────────────────────
+  function continuarATemplate() {
     if (!nombre.trim()) { show('Ingresa un nombre para la plantilla', 'error'); return }
+    if (!aseguradora.trim()) { show('Ingresa el nombre de la aseguradora', 'error'); return }
+    if (!tipoPoliza.trim()) { show('Ingresa el tipo de póliza', 'error'); return }
+    setStep(3)
+  }
+
+  // ── Step 3: guardar plantilla + subir template ─────────────────────────
+  async function guardar() {
+    if (!modoEdicion && !templateDocx) {
+      show('Selecciona el archivo .docx del template', 'error'); return
+    }
 
     const cajas = todasLasCajas().map(({ id, ...c }) => ({
       nombre: c.nombre,
@@ -93,8 +142,16 @@ export default function NuevaPlantillaPage() {
 
     setGuardando(true)
     try {
-      await crearPlantilla({ nombre: nombre.trim(), aseguradora, tipo_poliza: tipoPoliza, cajas })
-      show('Plantilla guardada correctamente', 'success')
+      const body = { nombre: nombre.trim(), aseguradora, tipo_poliza: tipoPoliza, cajas }
+      const plantilla = modoEdicion
+        ? await actualizarPlantilla(plantillaId, body)
+        : await crearPlantilla(body)
+
+      if (templateDocx) {
+        await subirTemplatePlantilla(plantilla.id, templateDocx)
+      }
+
+      show(modoEdicion ? 'Plantilla actualizada correctamente' : 'Plantilla guardada correctamente', 'success')
       navigate('/plantillas')
     } catch (e) {
       show(`Error guardando: ${e.message}`, 'error')
@@ -108,11 +165,12 @@ export default function NuevaPlantillaPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <h1 className={styles.title}>Nueva plantilla</h1>
+          <h1 className={styles.title}>{modoEdicion ? 'Editar plantilla' : 'Nueva plantilla'}</h1>
           <p className={styles.sub}>
-            {step === 0 && 'Sube el PDF modelo de la póliza'}
-            {step === 1 && 'Dibuja un rectángulo sobre cada campo a extraer'}
-            {step === 2 && 'Confirma los datos y guarda'}
+            {step === 0 && (modoEdicion ? 'Sube el PDF para ver y ajustar los campos' : 'Sube el PDF modelo de la póliza')}
+            {step === 1 && 'Dibuja o ajusta los campos a extraer'}
+            {step === 2 && 'Confirma los datos de la plantilla'}
+            {step === 3 && (modoEdicion ? 'Sube un nuevo template .docx o deja en blanco para mantener el actual' : 'Sube el documento Word que se usará para generar certificados')}
           </p>
         </div>
         <StepIndicator current={step} steps={STEPS} />
@@ -155,6 +213,11 @@ export default function NuevaPlantillaPage() {
                       <span className={styles.cajaNum}>{i + 1}</span>
                       <span className={styles.cajaNombre}>{c.nombre || '—'}</span>
                       <span className={styles.cajaPag}>p.{c.pagina + 1}</span>
+                      <button
+                        className={styles.cajaDeleteBtn}
+                        title="Eliminar campo"
+                        onClick={() => eliminarCajaPorId(c.id, c.pagina)}
+                      >✕</button>
                     </div>
                   ))
                 }
@@ -175,7 +238,7 @@ export default function NuevaPlantillaPage() {
                 file={archivo}
                 pageIndex={paginaActual}
                 onPageCount={setNumPaginas}
-                onPageSize={setPageSize}
+                onPageSize={handlePageSize}
               />
               {/* Canvas de cajas encima, posición absoluta */}
               {pageSize.width > 0 && (
@@ -203,34 +266,37 @@ export default function NuevaPlantillaPage() {
             <h2 className={styles.formTitle}>Datos de la plantilla</h2>
 
             <label className={styles.formLabel}>
-              Nombre
+              Nombre <span className={styles.required}>*</span>
               <input
-                className={styles.formInput}
+                className={`${styles.formInput} ${!nombre.trim() ? styles.inputError : ''}`}
                 value={nombre}
                 onChange={e => setNombre(e.target.value)}
                 placeholder="ej: Generali Desgravamen 2026"
                 autoFocus
               />
+              {!nombre.trim() && <span className={styles.fieldError}>Campo requerido</span>}
             </label>
 
             <label className={styles.formLabel}>
-              Aseguradora
+              Aseguradora <span className={styles.required}>*</span>
               <input
-                className={styles.formInput}
+                className={`${styles.formInput} ${!aseguradora.trim() ? styles.inputError : ''}`}
                 value={aseguradora}
                 onChange={e => setAseguradora(e.target.value.toLowerCase())}
-                placeholder="generali"
+                placeholder="ej: generali"
               />
+              {!aseguradora.trim() && <span className={styles.fieldError}>Campo requerido</span>}
             </label>
 
             <label className={styles.formLabel}>
-              Tipo de póliza
+              Tipo de póliza <span className={styles.required}>*</span>
               <input
-                className={styles.formInput}
+                className={`${styles.formInput} ${!tipoPoliza.trim() ? styles.inputError : ''}`}
                 value={tipoPoliza}
                 onChange={e => setTipoPoliza(e.target.value.toLowerCase())}
-                placeholder="desgravamen"
+                placeholder="ej: desgravamen"
               />
+              {!tipoPoliza.trim() && <span className={styles.fieldError}>Campo requerido</span>}
             </label>
 
             <div className={styles.formSummary}>
@@ -249,7 +315,54 @@ export default function NuevaPlantillaPage() {
 
           <div className={styles.formActions}>
             <Button variant="ghost" onClick={() => setStep(1)}>‹ Atrás</Button>
-            <Button loading={guardando} onClick={guardar}>Guardar plantilla</Button>
+            <Button onClick={continuarATemplate}>Continuar ›</Button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3 */}
+      {step === 3 && (
+        <div className={styles.formStep}>
+          <div className={styles.formCard}>
+            <h2 className={styles.formTitle}>Template de certificado</h2>
+            <p className={styles.templateHint}>
+              Sube el archivo <strong>.docx</strong> con los marcadores{' '}
+              <code className={styles.code}>{'{{nombre_variable}}'}</code> donde deben aparecer
+              los datos extraídos. Se guardará como{' '}
+              <code className={styles.code}>{aseguradora.trim()}_{tipoPoliza.trim()}.docx</code>.
+            </p>
+
+            <div
+              className={`${styles.templateDropzone} ${templateDocx ? styles.templateDropzoneOk : ''}`}
+              onDrop={e => {
+                e.preventDefault()
+                const f = e.dataTransfer.files[0]
+                if (f?.name.endsWith('.docx')) setTemplateDocx(f)
+                else show('El archivo debe ser un .docx', 'error')
+              }}
+              onDragOver={e => e.preventDefault()}
+            >
+              {templateDocx
+                ? <><span className={styles.templateIcon}>✓</span><span className={styles.templateNombre}>{templateDocx.name}</span></>
+                : <><span className={styles.templateIcon}>📄</span><span className={styles.templateTexto}>Arrastra el .docx aquí o haz clic para seleccionar</span></>
+              }
+              <input
+                type="file"
+                accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={e => { const f = e.target.files[0]; if (f) setTemplateDocx(f) }}
+                style={{
+                  position: 'absolute', inset: 0,
+                  opacity: 0, cursor: 'pointer', width: '100%', height: '100%',
+                }}
+              />
+            </div>
+          </div>
+
+          <div className={styles.formActions}>
+            <Button variant="ghost" onClick={() => setStep(2)}>‹ Atrás</Button>
+            <Button loading={guardando} disabled={!modoEdicion && !templateDocx} onClick={guardar}>
+              {modoEdicion ? 'Guardar cambios' : 'Guardar plantilla'}
+            </Button>
           </div>
         </div>
       )}
@@ -262,7 +375,7 @@ export default function NuevaPlantillaPage() {
 function DropZone({ onDrop, onChange }) {
   const [over, setOver] = useState(false)
   return (
-    <label
+    <div
       className={`${styles.dropzone} ${over ? styles.dropzoneOver : ''}`}
       onDrop={onDrop}
       onDragOver={e => { e.preventDefault(); setOver(true) }}
@@ -271,8 +384,16 @@ function DropZone({ onDrop, onChange }) {
       <div className={styles.dropIcon}>⬆</div>
       <span className={styles.dropText}>Arrastra el PDF aquí</span>
       <span className={styles.dropSub}>o haz clic para seleccionar</span>
-      <input type="file" accept="application/pdf" className={styles.srOnly} onChange={onChange} />
-    </label>
+      <input
+        type="file"
+        accept="application/pdf"
+        onChange={onChange}
+        style={{
+          position: 'absolute', inset: 0,
+          opacity: 0, cursor: 'pointer', width: '100%', height: '100%',
+        }}
+      />
+    </div>
   )
 }
 

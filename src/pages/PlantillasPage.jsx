@@ -74,6 +74,13 @@ export default function PlantillasPage() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={() => navigate('/plantillas/editar', { state: { plantillaId: p.id } })}
+                >
+                  Editar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleEliminar(p.id, p.nombre)}
                 >
                   Eliminar

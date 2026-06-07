@@ -124,7 +124,15 @@ export default function ProcesarPage() {
 
           <h2 className={styles.cardTitle}>Sube la póliza PDF</h2>
 
-          <label className={styles.dropzone}>
+          <div
+            className={styles.dropzone}
+            onDrop={e => {
+              e.preventDefault()
+              const f = e.dataTransfer.files[0]
+              if (f?.type === 'application/pdf') setArchivo(f)
+            }}
+            onDragOver={e => e.preventDefault()}
+          >
             {archivo
               ? <span className={styles.archivoNombre}>📄 {archivo.name}</span>
               : <>
@@ -136,10 +144,13 @@ export default function ProcesarPage() {
             <input
               type="file"
               accept="application/pdf"
-              className={styles.srOnly}
-              onChange={e => setArchivo(e.target.files[0])}
+              onChange={e => { const f = e.target.files[0]; if (f) setArchivo(f) }}
+              style={{
+                position: 'absolute', inset: 0,
+                opacity: 0, cursor: 'pointer', width: '100%', height: '100%',
+              }}
             />
-          </label>
+          </div>
 
           <div className={styles.stepActions}>
             <Button variant="ghost" onClick={() => setStep(0)}>‹ Atrás</Button>

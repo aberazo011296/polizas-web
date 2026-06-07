@@ -4,7 +4,10 @@ async function request(path, options = {}) {
   const res = await fetch(`${BASE_URL}${path}`, options)
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || 'Error desconocido')
+    const detail = Array.isArray(err.detail)
+      ? err.detail.map(e => `${e.loc?.join('.')}: ${e.msg}`).join('; ')
+      : err.detail || 'Error desconocido'
+    throw new Error(detail)
   }
   return res
 }
@@ -30,8 +33,27 @@ export async function obtenerPlantilla(id) {
   return res.json()
 }
 
+export async function actualizarPlantilla(id, body) {
+  const res = await request(`/plantillas/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return res.json()
+}
+
 export async function eliminarPlantilla(id) {
   await request(`/plantillas/${id}`, { method: 'DELETE' })
+}
+
+export async function subirTemplatePlantilla(id, archivo) {
+  const form = new FormData()
+  form.append('archivo', archivo)
+  const res = await request(`/plantillas/${id}/template`, {
+    method: 'POST',
+    body: form,
+  })
+  return res.json()
 }
 
 // ── Pólizas ────────────────────────────────────────────────────────────────

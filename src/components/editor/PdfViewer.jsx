@@ -15,6 +15,7 @@ export default function PdfViewer({ file, pageIndex = 0, onPageCount, onPageSize
   useEffect(() => {
     if (!file) return
     let cancelled = false
+    let renderTask = null
 
     async function render() {
       setError(null)
@@ -29,25 +30,37 @@ export default function PdfViewer({ file, pageIndex = 0, onPageCount, onPageSize
         if (cancelled) return
 
         const viewport = page.getViewport({ scale: 1.0 })
-        onPageSize?.({ width: viewport.width, height: viewport.height })
 
         const canvas = canvasRef.current
-        if (!canvas) return
+        if (!canvas || cancelled) return
 
         canvas.width  = viewport.width
         canvas.height = viewport.height
 
-        await page.render({
+        renderTask = page.render({
           canvasContext: canvas.getContext('2d'),
           viewport,
-        }).promise
+        })
+        await renderTask.promise
+
+        // Solo actualizar pageSize después de renderizar exitosamente
+        if (!cancelled) {
+          onPageSize?.({ width: viewport.width, height: viewport.height })
+        }
       } catch (e) {
-        if (!cancelled) setError(e.message)
+        if (!cancelled && e?.name !== 'RenderingCancelledException') {
+          setError(e.message)
+        }
       }
     }
 
     render()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      if (renderTask) {
+        renderTask.cancel()
+      }
+    }
   }, [file, pageIndex])
 
   if (error) return <div className={styles.error}>Error al renderizar el PDF: {error}</div>
