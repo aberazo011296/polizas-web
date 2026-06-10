@@ -1,6 +1,9 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { inspeccionarPDF, crearPlantilla, actualizarPlantilla, obtenerPlantilla, subirTemplatePlantilla } from '../services/api'
+import mammoth from 'mammoth'
+import { inspeccionarPDF, crearPlantilla, actualizarPlantilla, obtenerPlantilla } from '../services/api'
+
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 import PdfViewer from '../components/editor/PdfViewer'
 import CajaEditor from '../components/editor/CajaEditor'
 import Button from '../components/ui/Button'
@@ -39,7 +42,11 @@ export default function NuevaPlantillaPage() {
   const [guardando, setGuardando] = useState(false)
 
   // Step 3
-  const [templateDocx, setTemplateDocx] = useState(null)
+  const [templateArchivo, setTemplateArchivo] = useState(null)
+  const [templatePreview, setTemplatePreview] = useState('')
+  const [reemplazos, setReemplazos] = useState({})
+  const [camposManuales, setCamposManuales] = useState([]) // [{nombre, valor_por_defecto}]
+  const templateInputRef = useRef(null)
 
   // Cargar datos existentes en modo edición
   useEffect(() => {
@@ -57,6 +64,12 @@ export default function NuevaPlantillaPage() {
           porPagina[pagina].push({ ...c, id: Date.now() + i })
         })
         setCajasPorPagina(porPagina)
+        const r = {}
+        p.cajas.forEach(c => { r[c.nombre] = '' })
+        setReemplazos(r)
+        setCamposManuales(p.campos_manuales || [])
+        // En modo edición saltar directo a Datos (step 2)
+        setStep(2)
       })
       .catch(e => show(`Error cargando plantilla: ${e.message}`, 'error'))
   }, [plantillaId])
@@ -122,36 +135,78 @@ export default function NuevaPlantillaPage() {
     if (!nombre.trim()) { show('Ingresa un nombre para la plantilla', 'error'); return }
     if (!aseguradora.trim()) { show('Ingresa el nombre de la aseguradora', 'error'); return }
     if (!tipoPoliza.trim()) { show('Ingresa el tipo de póliza', 'error'); return }
+    // Inicializar reemplazos con las cajas definidas
+    const r = {}
+    todasLasCajas().forEach(c => { r[c.nombre] = reemplazos[c.nombre] || '' })
+    setReemplazos(r)
     setStep(3)
   }
 
-  // ── Step 3: guardar plantilla + subir template ─────────────────────────
+  async function handleTemplateArchivo(f) {
+    if (!f) return
+    setTemplateArchivo(f)
+    const buf = await f.arrayBuffer()
+    const result = await mammoth.convertToHtml({ arrayBuffer: buf })
+    setTemplatePreview(result.value)
+  }
+
+  function previewConResaltado() {
+    let html = templatePreview
+    // Resaltar extraídas
+    Object.entries(reemplazos).forEach(([variable, texto]) => {
+      if (!texto.trim()) return
+      const escaped = texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      html = html.replace(new RegExp(escaped, 'g'),
+        `<mark style="background:rgba(255,200,0,.45);border-radius:2px;padding:0 2px;" title="→ {{${variable}}}">${texto}</mark>`)
+    })
+    // Resaltar posición de campos manuales (texto_reemplazar)
+    camposManuales.forEach(({ nombre, texto_reemplazar }) => {
+      if (!texto_reemplazar?.trim() || !nombre.trim()) return
+      const escaped = texto_reemplazar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      html = html.replace(new RegExp(escaped, 'g'),
+        `<mark style="background:rgba(79,124,255,.25);border-radius:2px;padding:0 2px;" title="→ {{${nombre}}}">${texto_reemplazar}</mark>`)
+    })
+    return html
+  }
+
+  // ── Step 3: guardar plantilla + construir template ─────────────────────
   async function guardar() {
-    if (!modoEdicion && !templateDocx) {
-      show('Selecciona el archivo .docx del template', 'error'); return
+    if (!modoEdicion && !templateArchivo) {
+      show('Sube el documento Word original', 'error'); return
     }
 
     const cajas = todasLasCajas().map(({ id, ...c }) => ({
-      nombre: c.nombre,
-      pagina: c.pagina,
-      x: Math.round(c.x),
-      y: Math.round(c.y),
-      ancho: Math.round(c.ancho),
-      alto: Math.round(c.alto),
+      nombre: c.nombre, pagina: c.pagina,
+      x: Math.round(c.x), y: Math.round(c.y),
+      ancho: Math.round(c.ancho), alto: Math.round(c.alto),
     }))
 
     setGuardando(true)
     try {
-      const body = { nombre: nombre.trim(), aseguradora, tipo_poliza: tipoPoliza, cajas }
+      const body = { nombre: nombre.trim(), aseguradora, tipo_poliza: tipoPoliza, cajas, campos_manuales: camposManuales }
       const plantilla = modoEdicion
         ? await actualizarPlantilla(plantillaId, body)
         : await crearPlantilla(body)
 
-      if (templateDocx) {
-        await subirTemplatePlantilla(plantilla.id, templateDocx)
+      if (templateArchivo) {
+        const mapaReemplazos = { ...Object.fromEntries(Object.entries(reemplazos).filter(([, v]) => v.trim())) }
+        // Incluir posiciones de campos manuales
+        camposManuales.forEach(({ nombre, texto_reemplazar }) => {
+          if (nombre.trim() && texto_reemplazar?.trim()) mapaReemplazos[nombre] = texto_reemplazar
+        })
+        const form = new FormData()
+        form.append('archivo', templateArchivo)
+        form.append('reemplazos', JSON.stringify(mapaReemplazos))
+        const res = await fetch(`${BASE_URL}/plantillas/${plantilla.id}/template/build`, {
+          method: 'POST', body: form,
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: res.statusText }))
+          throw new Error(Array.isArray(err.detail) ? err.detail.map(e => e.msg).join('; ') : err.detail)
+        }
       }
 
-      show(modoEdicion ? 'Plantilla actualizada correctamente' : 'Plantilla guardada correctamente', 'success')
+      show(modoEdicion ? 'Plantilla actualizada' : 'Plantilla guardada correctamente', 'success')
       navigate('/plantillas')
     } catch (e) {
       show(`Error guardando: ${e.message}`, 'error')
@@ -170,7 +225,7 @@ export default function NuevaPlantillaPage() {
             {step === 0 && (modoEdicion ? 'Sube el PDF para ver y ajustar los campos' : 'Sube el PDF modelo de la póliza')}
             {step === 1 && 'Dibuja o ajusta los campos a extraer'}
             {step === 2 && 'Confirma los datos de la plantilla'}
-            {step === 3 && (modoEdicion ? 'Sube un nuevo template .docx o deja en blanco para mantener el actual' : 'Sube el documento Word que se usará para generar certificados')}
+            {step === 3 && 'Sube el Word original y mapea cada variable al texto que debe reemplazar'}
           </p>
         </div>
         <StepIndicator current={step} steps={STEPS} />
@@ -178,29 +233,35 @@ export default function NuevaPlantillaPage() {
 
       {/* STEP 0 */}
       {step === 0 && (
-        <DropZone onDrop={onDrop} onChange={e => handleArchivo(e.target.files[0])} />
+        <>
+          {modoEdicion && (
+            <div className={styles.editNotice}>
+              ℹ️ Para redibujar los campos necesitas subir el PDF original de nuevo. Si solo quieres editar los datos o el template, puedes continuar sin PDF.
+              <Button variant="ghost" size="sm" onClick={() => setStep(2)} style={{ marginLeft: 12 }}>
+                Ir a Datos →
+              </Button>
+            </div>
+          )}
+          <DropZone onDrop={onDrop} onChange={e => handleArchivo(e.target.files[0])} />
+        </>
       )}
 
       {/* STEP 1 */}
-      {step === 1 && archivo && (
+      {step === 1 && (
         <div className={styles.editorLayout}>
           {/* Controles izquierda */}
           <aside className={styles.editorSide}>
             <div className={styles.sideSection}>
-              <span className={styles.sideLabel}>Página</span>
-              <div className={styles.paginator}>
-                <button
-                  className={styles.pageBtn}
-                  disabled={paginaActual === 0}
-                  onClick={() => setPaginaActual(p => p - 1)}
-                >‹</button>
-                <span>{paginaActual + 1} / {numPaginas}</span>
-                <button
-                  className={styles.pageBtn}
-                  disabled={paginaActual === numPaginas - 1}
-                  onClick={() => setPaginaActual(p => p + 1)}
-                >›</button>
-              </div>
+              {archivo && (
+                <>
+                  <span className={styles.sideLabel}>Página</span>
+                  <div className={styles.paginator}>
+                    <button className={styles.pageBtn} disabled={paginaActual === 0} onClick={() => setPaginaActual(p => p - 1)}>‹</button>
+                    <span>{paginaActual + 1} / {numPaginas}</span>
+                    <button className={styles.pageBtn} disabled={paginaActual === numPaginas - 1} onClick={() => setPaginaActual(p => p + 1)}>›</button>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className={styles.sideSection}>
@@ -213,11 +274,7 @@ export default function NuevaPlantillaPage() {
                       <span className={styles.cajaNum}>{i + 1}</span>
                       <span className={styles.cajaNombre}>{c.nombre || '—'}</span>
                       <span className={styles.cajaPag}>p.{c.pagina + 1}</span>
-                      <button
-                        className={styles.cajaDeleteBtn}
-                        title="Eliminar campo"
-                        onClick={() => eliminarCajaPorId(c.id, c.pagina)}
-                      >✕</button>
+                      <button className={styles.cajaDeleteBtn} title="Eliminar campo" onClick={() => eliminarCajaPorId(c.id, c.pagina)}>✕</button>
                     </div>
                   ))
                 }
@@ -230,31 +287,34 @@ export default function NuevaPlantillaPage() {
             </div>
           </aside>
 
-          {/* Canvas */}
+          {/* Canvas o zona de carga */}
           <div className={styles.canvasArea}>
-            <div className={styles.pdfStack}>
-              {/* PDF renderizado debajo */}
-              <PdfViewer
-                file={archivo}
-                pageIndex={paginaActual}
-                onPageCount={setNumPaginas}
-                onPageSize={handlePageSize}
-              />
-              {/* Canvas de cajas encima, posición absoluta */}
-              {pageSize.width > 0 && (
-                <div className={styles.konvaOverlay}>
-                  <CajaEditor
-                    width={pageSize.width}
-                    height={pageSize.height}
-                    cajas={getCajasActuales()}
-                    onChange={setCajasActuales}
+            {!archivo ? (
+              <div className={styles.uploadPdfZone}>
+                <span className={styles.uploadPdfIcon}>🗺</span>
+                <span className={styles.uploadPdfText}>Sube el PDF para dibujar o agregar campos</span>
+                <span className={styles.uploadPdfSub}>Los campos existentes se mostrarán sobre el PDF</span>
+                <label className={styles.uploadPdfBtn}>
+                  Seleccionar PDF
+                  <input
+                    type="file" accept="application/pdf" style={{ display: 'none' }}
+                    onChange={e => handleArchivo(e.target.files[0])}
                   />
+                </label>
+              </div>
+            ) : (
+              <>
+                <div className={styles.pdfStack}>
+                  <PdfViewer file={archivo} pageIndex={paginaActual} onPageCount={setNumPaginas} onPageSize={handlePageSize} />
+                  {pageSize.width > 0 && (
+                    <div className={styles.konvaOverlay}>
+                      <CajaEditor width={pageSize.width} height={pageSize.height} cajas={getCajasActuales()} onChange={setCajasActuales} />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <p className={styles.hint}>
-              Haz clic y arrastra para marcar un campo. Haz clic en una caja para nombrarla.
-            </p>
+                <p className={styles.hint}>Haz clic y arrastra para marcar un campo. Haz clic en una caja para nombrarla.</p>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -322,48 +382,132 @@ export default function NuevaPlantillaPage() {
 
       {/* STEP 3 */}
       {step === 3 && (
-        <div className={styles.formStep}>
-          <div className={styles.formCard}>
-            <h2 className={styles.formTitle}>Template de certificado</h2>
-            <p className={styles.templateHint}>
-              Sube el archivo <strong>.docx</strong> con los marcadores{' '}
-              <code className={styles.code}>{'{{nombre_variable}}'}</code> donde deben aparecer
-              los datos extraídos. Se guardará como{' '}
-              <code className={styles.code}>{aseguradora.trim()}_{tipoPoliza.trim()}.docx</code>.
-            </p>
+        <div className={styles.templateLayout}>
+          {/* Columna izquierda: upload + preview */}
+          <div className={styles.templateLeft}>
+            {!templateArchivo ? (
+              <div
+                className={styles.templateDropzone}
+                onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f?.name.endsWith('.docx')) handleTemplateArchivo(f) }}
+                onDragOver={e => e.preventDefault()}
+              >
+                <span className={styles.templateIcon}>📄</span>
+                <span className={styles.templateTexto}>Sube el Word original con los datos reales</span>
+                <span className={styles.templateSub}>Ej: el documento con "990664", "FONDO DE JUBILACION...", etc.</span>
+                <input
+                  type="file"
+                  accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={e => { const f = e.target.files[0]; if (f) handleTemplateArchivo(f) }}
+                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+                />
+              </div>
+            ) : (
+              <>
+                <div className={styles.previewHeader}>
+                  <span className={styles.previewTitle}>📄 {templateArchivo.name}</span>
+                  <button className={styles.cambiarBtn} onClick={() => { setTemplateArchivo(null); setTemplatePreview('') }}>
+                    Cambiar archivo
+                  </button>
+                </div>
+                <div
+                  className={styles.previewContent}
+                  dangerouslySetInnerHTML={{ __html: previewConResaltado() }}
+                />
+              </>
+            )}
+          </div>
 
-            <div
-              className={`${styles.templateDropzone} ${templateDocx ? styles.templateDropzoneOk : ''}`}
-              onDrop={e => {
-                e.preventDefault()
-                const f = e.dataTransfer.files[0]
-                if (f?.name.endsWith('.docx')) setTemplateDocx(f)
-                else show('El archivo debe ser un .docx', 'error')
-              }}
-              onDragOver={e => e.preventDefault()}
-            >
-              {templateDocx
-                ? <><span className={styles.templateIcon}>✓</span><span className={styles.templateNombre}>{templateDocx.name}</span></>
-                : <><span className={styles.templateIcon}>📄</span><span className={styles.templateTexto}>Arrastra el .docx aquí o haz clic para seleccionar</span></>
-              }
-              <input
-                type="file"
-                accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={e => { const f = e.target.files[0]; if (f) setTemplateDocx(f) }}
-                style={{
-                  position: 'absolute', inset: 0,
-                  opacity: 0, cursor: 'pointer', width: '100%', height: '100%',
-                }}
-              />
+          {/* Columna derecha: variables */}
+          <aside className={styles.templatePanel}>
+            <div className={styles.templatePanelTop}>
+              <span className={styles.panelTitle}>Variables a reemplazar</span>
+              <p className={styles.panelHint}>
+                Escribe el texto exacto del documento que debe convertirse en cada variable.
+                Se resaltará en amarillo en el preview.
+              </p>
             </div>
-          </div>
 
-          <div className={styles.formActions}>
-            <Button variant="ghost" onClick={() => setStep(2)}>‹ Atrás</Button>
-            <Button loading={guardando} disabled={!modoEdicion && !templateDocx} onClick={guardar}>
-              {modoEdicion ? 'Guardar cambios' : 'Guardar plantilla'}
-            </Button>
-          </div>
+            {/* Variables de extracción */}
+            <span className={styles.varSectionLabel}>Extraídas del PDF</span>
+            <div className={styles.varList}>
+              {todasLasCajas().map(c => {
+                const valor = reemplazos[c.nombre] || ''
+                const ok = valor.trim() !== ''
+                return (
+                  <div key={c.nombre} className={`${styles.varItem} ${ok ? styles.varItemOk : ''}`}>
+                    <div className={styles.varLabel}>
+                      <span className={styles.varIndicator}>{ok ? '✓' : '○'}</span>
+                      <code className={styles.varNombre}>{`{{${c.nombre}}}`}</code>
+                    </div>
+                    <input
+                      className={styles.varInput}
+                      placeholder="Texto en el documento..."
+                      value={valor}
+                      onChange={e => setReemplazos(prev => ({ ...prev, [c.nombre]: e.target.value }))}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Campos manuales */}
+            <div className={styles.varSectionHeader}>
+              <span className={styles.varSectionLabel}>Ingreso manual</span>
+              <button
+                className={styles.addManualBtn}
+                onClick={() => setCamposManuales(prev => [...prev, { nombre: '', valor_por_defecto: '' }])}
+              >+ Agregar</button>
+            </div>
+            <div className={styles.varList}>
+              {camposManuales.length === 0 && (
+                <p className={styles.varEmptyHint}>Campos que el usuario completa al procesar cada póliza (ej: nombre_asegurado)</p>
+              )}
+              {camposManuales.map((campo, i) => (
+                <div key={i} className={`${styles.varItem} ${campo.nombre.trim() ? styles.varItemManual : ''}`}>
+                  <div className={styles.varLabel}>
+                    <span className={styles.varIndicatorManual}>M</span>
+                    <input
+                      className={styles.varNombreInput}
+                      placeholder="nombre_variable"
+                      value={campo.nombre}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\s+/g, '_')
+                        setCamposManuales(prev => prev.map((c, j) => j === i ? { ...c, nombre: val } : c))
+                      }}
+                    />
+                    <button
+                      className={styles.varDeleteBtn}
+                      onClick={() => setCamposManuales(prev => prev.filter((_, j) => j !== i))}
+                    >✕</button>
+                  </div>
+                  <input
+                    className={styles.varInput}
+                    placeholder="Valor por defecto (opcional)"
+                    value={campo.valor_por_defecto}
+                    onChange={e => setCamposManuales(prev => prev.map((c, j) => j === i ? { ...c, valor_por_defecto: e.target.value } : c))}
+                  />
+                  <input
+                    className={`${styles.varInput} ${styles.varInputPos}`}
+                    placeholder="Texto en el doc a reemplazar (ej: CEDULA_AQUI)"
+                    value={campo.texto_reemplazar || ''}
+                    onChange={e => setCamposManuales(prev => prev.map((c, j) => j === i ? { ...c, texto_reemplazar: e.target.value } : c))}
+                  />
+                  {!campo.texto_reemplazar?.trim() && campo.nombre.trim() && (
+                    <p className={styles.varPosHint}>
+                      ✏️ En el Word escribe un placeholder donde quieres que aparezca (ej: <code>CEDULA_AQUI</code>) y ponlo aquí
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className={styles.templateActions}>
+              <Button variant="ghost" size="sm" onClick={() => setStep(2)}>‹ Atrás</Button>
+              <Button loading={guardando} disabled={!modoEdicion && !templateArchivo} onClick={guardar}>
+                {modoEdicion ? 'Guardar cambios' : 'Guardar plantilla'}
+              </Button>
+            </div>
+          </aside>
         </div>
       )}
     </div>

@@ -74,6 +74,13 @@ export default function PlantillasPage() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  onClick={() => navigate('/plantillas/template', { state: { plantillaId: p.id } })}
+                >
+                  Template
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => navigate('/plantillas/editar', { state: { plantillaId: p.id } })}
                 >
                   Editar

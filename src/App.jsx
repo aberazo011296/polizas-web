@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage'
 import PlantillasPage from './pages/PlantillasPage'
 import NuevaPlantillaPage from './pages/NuevaPlantillaPage'
 import ProcesarPage from './pages/ProcesarPage'
+import EditarTemplatePage from './pages/EditarTemplatePage'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/plantillas/nueva" element={<NuevaPlantillaPage />} />
           <Route path="/plantillas/editar" element={<NuevaPlantillaPage />} />
           <Route path="/procesar" element={<ProcesarPage />} />
+          <Route path="/plantillas/template" element={<EditarTemplatePage />} />
         </Routes>
       </Layout>
       <ToastContainer />
