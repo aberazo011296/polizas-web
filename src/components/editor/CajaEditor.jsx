@@ -129,8 +129,8 @@ export default function CajaEditor({ width, height, cajas, onChange }) {
             <Rect
               x={preview.x} y={preview.y}
               width={preview.w} height={preview.h}
-              fill="rgba(79,124,255,.15)"
-              stroke="#4f7cff"
+              fill="rgba(192,34,15,.12)"
+              stroke="#c0220f"
               strokeWidth={1.5}
               dash={[4, 3]}
             />

@@ -23,12 +23,13 @@
   margin-bottom: 16px;
 }
 .logoIcon {
-  font-size: 20px;
+  display: flex;
+  align-items: center;
   color: var(--accent);
 }
 .logoText {
-  font-family: var(--font-serif);
-  font-size: 18px;
+  font-size: 16px;
+  font-weight: 650;
   color: var(--ink);
   letter-spacing: -.02em;
 }
@@ -53,9 +54,9 @@
   text-decoration: none;
 }
 .navItem:hover { background: var(--surface2); color: var(--ink); text-decoration: none; }
-.navItem.active { background: rgba(79,124,255,.12); color: var(--accent); }
+.navItem.active { background: rgba(192,34,15,.12); color: var(--accent); }
 
-.navIcon { font-size: 15px; width: 18px; text-align: center; }
+.navIcon { display: flex; align-items: center; width: 18px; }
 
 .sidebarFooter {
   padding: 12px 8px 0;
@@ -66,5 +67,5 @@
 .main {
   flex: 1;
   overflow-y: auto;
-  padding: 32px 36px;
+  padding: 36px 48px;
 }

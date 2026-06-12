@@ -8,6 +8,34 @@ import styles from './ProcesarPage.module.css'
 
 const STEPS = ['Seleccionar', 'Extraer', 'Revisar y descargar']
 
+const ORIGEN_LABEL = {
+  extraido_ia: 'leído por IA',
+  extraido_directo: 'leído del PDF',
+  extraido: 'leído con OCR',
+  manual: 'ingreso manual',
+}
+
+const ESTADO_LABEL = { ok: 'verificado', falta: 'falta', dudoso: 'revisar' }
+
+// Pendientes primero para que la persona vea de inmediato qué le toca hacer
+const ORDEN_ESTADO = { falta: 0, dudoso: 1, ok: 2 }
+
+// Los campos cortos van en dos columnas; los largos ocupan el ancho completo
+function esCampoLargo(valor) {
+  const texto = valor || ''
+  return texto.includes('\n') || texto.length > 55
+}
+
+// Altura del textarea según los saltos de línea y el texto que se
+// envuelve por ancho (~90 caracteres por línea a ancho completo)
+function filasPara(valor) {
+  const texto = valor || ''
+  const filas = texto
+    .split('\n')
+    .reduce((n, linea) => n + Math.max(1, Math.ceil(linea.length / 90)), 0)
+  return Math.min(10, Math.max(1, filas))
+}
+
 export default function ProcesarPage() {
   const location = useLocation()
   const { show } = useToast()
@@ -155,7 +183,7 @@ export default function ProcesarPage() {
           <div className={styles.stepActions}>
             <Button variant="ghost" onClick={() => setStep(0)}>‹ Atrás</Button>
             <Button loading={extrayendo} disabled={!archivo} onClick={extraer}>
-              {extrayendo ? 'Extrayendo con OCR…' : 'Extraer campos ›'}
+              {extrayendo ? 'Leyendo la póliza…' : 'Leer póliza ›'}
             </Button>
           </div>
         </div>
@@ -168,7 +196,10 @@ export default function ProcesarPage() {
             <div className={styles.panelHeader}>
               <h2 className={styles.cardTitle}>Campos extraídos</h2>
               <div className={styles.stats}>
-                <span className={styles.statOk}>{variables.filter(v => v.estado === 'ok').length} ok</span>
+                <span className={styles.statOk}>{variables.filter(v => v.estado === 'ok').length} verificados</span>
+                {variables.some(v => v.estado === 'dudoso') && (
+                  <span className={styles.statDudoso}>{variables.filter(v => v.estado === 'dudoso').length} por revisar</span>
+                )}
                 <span className={styles.statFalta}>{variables.filter(v => v.estado === 'falta').length} faltantes</span>
               </div>
             </div>
@@ -179,19 +210,31 @@ export default function ProcesarPage() {
               </div>
             )}
 
+            <p className={styles.leyenda}>
+              Revisa cada campo antes de descargar: los <strong>verificados</strong> se
+              comprobaron contra el texto del PDF, los marcados <strong>revisar</strong> o{' '}
+              <strong>falta</strong> necesitan tu atención.
+            </p>
+
             <div className={styles.varList}>
-              {variables.map(v => (
-                <div key={v.nombre} className={styles.varItem}>
+              {[...variables]
+                .sort((a, b) => (ORDEN_ESTADO[a.estado] ?? 3) - (ORDEN_ESTADO[b.estado] ?? 3))
+                .map(v => (
+                <div
+                  key={v.nombre}
+                  className={`${styles.varItem} ${esCampoLargo(v.valor) ? styles.varItemFull : ''}`}
+                >
                   <div className={styles.varHeader}>
                     <code className={styles.varNombre}>{v.nombre}</code>
                     <div className={styles.varMeta}>
-                      <Badge status={v.estado}>{v.estado}</Badge>
-                      <span className={styles.origen}>{v.origen}</span>
+                      <Badge status={v.estado}>{ESTADO_LABEL[v.estado] || v.estado}</Badge>
+                      <span className={styles.origen}>{ORIGEN_LABEL[v.origen] || v.origen}</span>
                     </div>
                   </div>
-                  <input
+                  <textarea
                     className={`${styles.varInput} ${v.estado === 'falta' ? styles.varInputFalta : ''}`}
                     value={v.valor || ''}
+                    rows={filasPara(v.valor)}
                     onChange={e => updateVariable(v.nombre, e.target.value)}
                     placeholder={v.estado === 'falta' ? 'Campo vacío — ingresa el valor' : ''}
                   />

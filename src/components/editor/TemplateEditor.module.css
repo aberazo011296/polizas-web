@@ -30,7 +30,7 @@
   transition: background .1s, color .1s;
 }
 .toolBtn:hover { background: var(--surface); color: var(--ink); }
-.toolBtnActive { background: rgba(79,124,255,.15); color: var(--accent); border-color: rgba(79,124,255,.3); }
+.toolBtnActive { background: rgba(192,34,15,.15); color: var(--accent); border-color: rgba(192,34,15,.3); }
 .toolSep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
 
 /* Editor content area */
@@ -66,9 +66,9 @@
 .variableChip {
   display: inline-flex;
   align-items: center;
-  background: rgba(79,124,255,.15);
+  background: rgba(192,34,15,.15);
   color: var(--accent);
-  border: 1px solid rgba(79,124,255,.35);
+  border: 1px solid rgba(192,34,15,.35);
   border-radius: 4px;
   padding: 0 6px;
   font-family: var(--font-mono);

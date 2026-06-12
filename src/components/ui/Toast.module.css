@@ -22,5 +22,5 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 .info    { background: var(--surface2); color: var(--ink);     border: 1px solid var(--border2); }
-.success { background: rgba(52,199,123,.2); color: var(--success); border: 1px solid rgba(52,199,123,.3); }
-.error   { background: rgba(232,69,90,.2);  color: var(--danger);  border: 1px solid rgba(232,69,90,.3);  }
+.success { background: rgba(21,128,61,.2); color: var(--success); border: 1px solid rgba(21,128,61,.3); }
+.error   { background: rgba(185,28,28,.2);  color: var(--danger);  border: 1px solid rgba(185,28,28,.3);  }

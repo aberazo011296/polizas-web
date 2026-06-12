@@ -13,7 +13,7 @@
 
 /* Variants */
 .primary   { background: var(--accent);    color: #fff; }
-.primary:hover { background: #6490ff; }
+.primary:hover { background: #a81d0d; }
 .secondary { background: var(--surface2);  color: var(--ink); border: 1px solid var(--border2); }
 .secondary:hover { border-color: var(--accent); color: var(--accent); }
 .ghost     { background: transparent;      color: var(--ink2); }

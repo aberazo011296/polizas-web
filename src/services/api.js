@@ -56,6 +56,16 @@ export async function subirTemplatePlantilla(id, archivo) {
   return res.json()
 }
 
+export async function sugerirVariables(archivo) {
+  const form = new FormData()
+  form.append('archivo', archivo)
+  const res = await request('/plantillas/sugerir-variables', {
+    method: 'POST',
+    body: form,
+  })
+  return res.json()
+}
+
 // ── Pólizas ────────────────────────────────────────────────────────────────
 
 export async function inspeccionarPDF(archivo) {

@@ -5,13 +5,13 @@
 }
 .canvas {
   display: block;
-  box-shadow: 0 2px 20px rgba(0,0,0,.5);
+  box-shadow: 0 4px 24px rgba(33,31,29,.18);
 }
 .error {
   padding: 16px;
   color: var(--danger);
-  background: rgba(232,69,90,.08);
-  border: 1px solid rgba(232,69,90,.2);
+  background: rgba(185,28,28,.08);
+  border: 1px solid rgba(185,28,28,.2);
   border-radius: var(--radius);
   font-size: 13px;
 }

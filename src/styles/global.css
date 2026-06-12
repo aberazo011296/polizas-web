@@ -1,28 +1,32 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg:        #0e0f11;
-  --surface:   #16181c;
-  --surface2:  #1e2127;
-  --border:    #2a2d35;
-  --border2:   #383c46;
+  /* Tema claro — rojo institucional Generali como acento */
+  --bg:        #f7f6f4;
+  --surface:   #ffffff;
+  --surface2:  #f3f1ee;
+  --border:    #e6e3de;
+  --border2:   #d3cfc8;
 
-  --ink:       #eef0f4;
-  --ink2:      #9ba3b2;
-  --ink3:      #5c6272;
+  --ink:       #211f1d;
+  --ink2:      #635f59;
+  --ink3:      #9b968d;
 
-  --accent:    #4f7cff;
-  --accent-dim:#2a4db8;
-  --success:   #34c77b;
-  --warn:      #f0a832;
-  --danger:    #e8455a;
+  --accent:      #c0220f;
+  --accent-dim:  #98190a;
+  --accent-soft: rgba(192, 34, 15, .08);
+  --success:   #15803d;
+  --warn:      #b45309;
+  --warning:   #b45309;
+  --danger:    #b91c1c;
 
   --radius:    8px;
   --radius-lg: 14px;
-  --shadow:    0 4px 24px rgba(0,0,0,.45);
+  --shadow:    0 2px 12px rgba(33, 31, 29, .08);
 
-  --font-serif: 'DM Serif Display', Georgia, serif;
-  --font-sans:  'DM Sans', system-ui, sans-serif;
+  /* Tipografía única y moderna: Inter para todo, mono solo para datos */
+  --font-serif: 'Inter', system-ui, sans-serif;
+  --font-sans:  'Inter', system-ui, sans-serif;
   --font-mono:  'DM Mono', monospace;
 }
 
@@ -46,21 +50,24 @@ button { cursor: pointer; font-family: inherit; }
 input, textarea, select {
   font-family: inherit;
   font-size: inherit;
-  background: var(--surface2);
+  background: var(--surface);
   color: var(--ink);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border2);
   border-radius: var(--radius);
   padding: 8px 12px;
   outline: none;
-  transition: border-color .15s;
+  transition: border-color .15s, box-shadow .15s;
 }
 input:focus, textarea:focus, select:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
+input::placeholder, textarea::placeholder { color: var(--ink3); }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--surface); }
-::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink3); }
 
 /* Utility classes */
 .sr-only {

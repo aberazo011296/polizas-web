@@ -7,7 +7,7 @@
   font-family: var(--font-mono);
   letter-spacing: .02em;
 }
-.ok      { background: rgba(52,199,123,.15); color: var(--success); }
-.falta   { background: rgba(232,69,90,.15);  color: var(--danger);  }
-.dudoso  { background: rgba(240,168,50,.15); color: var(--warn);    }
+.ok      { background: rgba(21,128,61,.15); color: var(--success); }
+.falta   { background: rgba(185,28,28,.15);  color: var(--danger);  }
+.dudoso  { background: rgba(180,83,9,.15); color: var(--warn);    }
 .neutral { background: var(--surface2);      color: var(--ink3);    }

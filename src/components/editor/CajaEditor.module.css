@@ -43,7 +43,7 @@
   border-radius: 4px;
   transition: background .12s;
 }
-.deleteBtn:hover { background: rgba(232,69,90,.1); }
+.deleteBtn:hover { background: rgba(185,28,28,.1); }
 
 .label {
   display: flex;

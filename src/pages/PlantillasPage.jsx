@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listarPlantillas, eliminarPlantilla } from '../services/api'
 import Button from '../components/ui/Button'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import { useToast } from '../components/ui/Toast'
 import styles from './PlantillasPage.module.css'
 
@@ -23,14 +24,20 @@ export default function PlantillasPage() {
 
   useEffect(() => { cargar() }, [])
 
-  async function handleEliminar(id, nombre) {
-    if (!confirm(`¿Eliminar la plantilla "${nombre}"?`)) return
+  const [porEliminar, setPorEliminar] = useState(null)
+  const [eliminando, setEliminando] = useState(false)
+
+  async function confirmarEliminar() {
+    setEliminando(true)
     try {
-      await eliminarPlantilla(id)
+      await eliminarPlantilla(porEliminar.id)
       show('Plantilla eliminada', 'success')
+      setPorEliminar(null)
       cargar()
     } catch (e) {
       show(`Error: ${e.message}`, 'error')
+    } finally {
+      setEliminando(false)
     }
   }
 
@@ -88,7 +95,7 @@ export default function PlantillasPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleEliminar(p.id, p.nombre)}
+                  onClick={() => setPorEliminar(p)}
                 >
                   Eliminar
                 </Button>
@@ -97,6 +104,16 @@ export default function PlantillasPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!porEliminar}
+        title="Eliminar plantilla"
+        message={porEliminar ? `Se eliminará la plantilla "${porEliminar.nombre}" con sus ${porEliminar.num_variables} campos. Esta acción no se puede deshacer.` : ''}
+        confirmLabel="Eliminar"
+        loading={eliminando}
+        onConfirm={confirmarEliminar}
+        onCancel={() => setPorEliminar(null)}
+      />
     </div>
   )
 }
