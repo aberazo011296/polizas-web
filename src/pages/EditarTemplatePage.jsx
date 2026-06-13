@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import mammoth from 'mammoth'
+import DOMPurify from 'dompurify'
 import { obtenerPlantilla, actualizarPlantilla } from '../services/api'
 import Button from '../components/ui/Button'
 import { useToast } from '../components/ui/Toast'
@@ -107,7 +108,9 @@ export default function EditarTemplatePage() {
         )
       })
     })
-    return html
+    // El HTML viene de un .docx subido (mammoth): sanitizar antes de
+    // inyectarlo con dangerouslySetInnerHTML para evitar XSS.
+    return DOMPurify.sanitize(html)
   }
 
   async function generarTemplate() {

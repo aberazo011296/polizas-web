@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import mammoth from 'mammoth'
+import DOMPurify from 'dompurify'
 import { crearPlantilla, actualizarPlantilla, obtenerPlantilla, sugerirVariables } from '../services/api'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -160,7 +161,9 @@ export default function NuevaPlantillaPage() {
       html = html.replace(new RegExp(escaped, 'g'),
         `<mark style="background:rgba(192,34,15,.18);border-radius:2px;padding:0 2px;" title="→ {{${nombre}}}">${texto_reemplazar}</mark>`)
     })
-    return html
+    // El HTML viene de un .docx subido (mammoth): sanitizar antes de
+    // inyectarlo con dangerouslySetInnerHTML para evitar XSS.
+    return DOMPurify.sanitize(html)
   }
 
   async function guardar() {
