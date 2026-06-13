@@ -91,11 +91,11 @@ export async function extraerVariables(archivo, plantillaId) {
 
 // ── Certificados ───────────────────────────────────────────────────────────
 
-export async function generarCertificado(plantillaId, variables) {
+export async function generarCertificado(plantillaId, variables, coberturas = []) {
   const res = await request('/certificados/generar', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ plantilla_id: plantillaId, variables }),
+    body: JSON.stringify({ plantilla_id: plantillaId, variables, coberturas }),
   })
   const blob = await res.blob()
   const filename =

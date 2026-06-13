@@ -33,6 +33,9 @@ export default function NuevaPlantillaPage() {
 
   // Step 1: variables (nombre + descripción para la IA)
   const [variables, setVariables] = useState([]) // [{nombre, descripcion}]
+  // Coberturas como grupo repetible: sub-campos de UNA cobertura (opcional).
+  // Vacío = la plantilla NO usa coberturas dinámicas (todo campo plano).
+  const [coberturasCampos, setCoberturasCampos] = useState([]) // [{nombre, descripcion}]
   const [sugiriendo, setSugiriendo] = useState(false)
   // Sugerencias de la IA pendientes de decidir si reemplazan o se agregan
   const [sugerenciasPendientes, setSugerenciasPendientes] = useState(null)
@@ -60,6 +63,7 @@ export default function NuevaPlantillaPage() {
           ? p.variables
           : (p.cajas || []).map(c => ({ nombre: c.nombre, descripcion: '' })))
         setVariables(vars)
+        setCoberturasCampos(p.coberturas_campos || [])
         const r = {}
         vars.forEach(v => { r[v.nombre] = '' })
         setReemplazos(r)
@@ -81,14 +85,22 @@ export default function NuevaPlantillaPage() {
     if (!f) return
     setSugiriendo(true)
     try {
-      const { variables: sugeridas } = await sugerirVariables(f)
+      const { variables: sugeridas, coberturas_campos: cobsSugeridas = [] } = await sugerirVariables(f)
+      // Las coberturas sugeridas solo se aplican si aún no hay definidas
+      // (no pisan un grupo que la persona ya ajustó a mano).
+      if (cobsSugeridas.length > 0 && coberturasCampos.length === 0) {
+        setCoberturasCampos(cobsSugeridas)
+      }
       const conNombre = variables.filter(v => v.nombre.trim())
       if (conNombre.length > 0) {
         // Hay variables previas: preguntar si reemplazar o agregar
         setSugerenciasPendientes(sugeridas)
       } else {
         setVariables(sugeridas)
-        show(`${sugeridas.length} variables sugeridas — revisa y ajusta la lista`, 'success')
+        const extra = cobsSugeridas.length > 0
+          ? ` y ${cobsSugeridas.length} sub-campos de cobertura`
+          : ''
+        show(`${sugeridas.length} variables sugeridas${extra} — revisa y ajusta`, 'success')
       }
     } catch (e) {
       show(`Error sugiriendo variables: ${e.message}`, 'error')
@@ -113,6 +125,17 @@ export default function NuevaPlantillaPage() {
 
   function setVariable(i, campo, valor) {
     setVariables(prev => prev.map((v, j) => j === i ? { ...v, [campo]: valor } : v))
+  }
+
+  // ── Coberturas (grupo repetible) ──
+  function setCoberturaCampo(i, campo, valor) {
+    setCoberturasCampos(prev => prev.map((c, j) => j === i ? { ...c, [campo]: valor } : c))
+  }
+  function agregarCoberturaCampo() {
+    setCoberturasCampos(prev => [...prev, { nombre: '', descripcion: '' }])
+  }
+  function quitarCoberturaCampo(i) {
+    setCoberturasCampos(prev => prev.filter((_, j) => j !== i))
   }
 
   function validarVariables() {
@@ -180,6 +203,7 @@ export default function NuevaPlantillaPage() {
         cajas: cajasOriginales,
         variables: variables.filter(v => v.nombre.trim()),
         campos_manuales: camposManuales.filter(c => c.nombre.trim()),
+        coberturas_campos: coberturasCampos.filter(c => c.nombre.trim()),
       }
       const plantilla = modoEdicion
         ? await actualizarPlantilla(plantillaId, body)
@@ -391,6 +415,73 @@ export default function NuevaPlantillaPage() {
                   >✕</button>
                 </div>
               ))}
+            </div>
+
+            {/* ── Coberturas como grupo repetible (opcional) ── */}
+            <div className={styles.coberturasSection}>
+              <div className={styles.coberturasSectionHead}>
+                <div>
+                  <h3 className={styles.coberturasSectionTitle}>
+                    Coberturas que se repiten <span className={styles.opcionalTag}>opcional</span>
+                  </h3>
+                  <p className={styles.coberturasSectionHint}>
+                    Para pólizas con un <strong>cuadro de coberturas</strong> (Muerte,
+                    Incapacidad, Anticipo de Enfermedades Graves…) que cambia de una
+                    póliza a otra.
+                  </p>
+                </div>
+                <Button variant="secondary" size="sm" onClick={agregarCoberturaCampo}>
+                  + Agregar sub-campo
+                </Button>
+              </div>
+
+              <div className={styles.coberturasExplica}>
+                <p>
+                  Define <strong>una sola vez</strong> los datos que tiene <em>una</em> cobertura
+                  (su nombre, suma, descripción, exclusiones…). La IA detectará{' '}
+                  <strong>todas</strong> las coberturas de cada póliza —sean 2, 3 o más— y el
+                  certificado las repetirá automáticamente. Así no defines una variable por
+                  cobertura ni creas una plantilla distinta cuando aparece una cobertura nueva.
+                </p>
+                <p className={styles.coberturasExplicaNota}>
+                  Déjalo vacío si esta póliza no tiene coberturas variables: en ese caso cada
+                  dato va como una variable normal de la lista de arriba.
+                </p>
+              </div>
+
+              {coberturasCampos.length > 0 && (
+                <div className={styles.varDefList}>
+                  {coberturasCampos.map((c, i) => (
+                    <div key={i} className={styles.varDefRow}>
+                      <span className={styles.varDefNum}>↻</span>
+                      <div className={styles.varDefInputs}>
+                        <input
+                          className={styles.varDefNombre}
+                          placeholder="nombre / suma_asegurada / listado_exclusiones"
+                          value={c.nombre}
+                          onChange={e => setCoberturaCampo(i, 'nombre', normalizarNombre(e.target.value))}
+                        />
+                        {c.nombre.startsWith('listado_') && (
+                          <span className={styles.varDefBadge} title="Por el prefijo listado_, cada ítem irá en su propio párrafo en el Word">
+                            ↵ un párrafo por ítem
+                          </span>
+                        )}
+                        <input
+                          className={styles.varDefDesc}
+                          placeholder="Qué es este sub-campo en CUALQUIER cobertura (genérico, no atado a una)"
+                          value={c.descripcion}
+                          onChange={e => setCoberturaCampo(i, 'descripcion', e.target.value)}
+                        />
+                      </div>
+                      <button
+                        className={styles.varDefDelete}
+                        title="Eliminar sub-campo"
+                        onClick={() => quitarCoberturaCampo(i)}
+                      >✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

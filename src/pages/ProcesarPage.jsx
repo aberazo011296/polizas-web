@@ -46,6 +46,7 @@ export default function ProcesarPage() {
   const [archivo, setArchivo] = useState(null)
   const [extrayendo, setExtrayendo] = useState(false)
   const [variables, setVariables] = useState([]) // [{nombre, valor, estado, origen}]
+  const [coberturas, setCoberturas] = useState([]) // [{campo: valor, ...}]
   const [advertencias, setAdvertencias] = useState([])
   const [generando, setGenerando] = useState(false)
 
@@ -66,7 +67,14 @@ export default function ProcesarPage() {
     setExtrayendo(true)
     try {
       const res = await extraerVariables(archivo, plantillaId)
-      setVariables(res.variables)
+      // Ordenar UNA sola vez (pendientes primero) al cargar. No reordenar en
+      // cada render: si no, al escribir un campo pasa de "falta" a "ok" y salta
+      // de posición mientras la persona escribe.
+      const ordenadas = [...res.variables].sort(
+        (a, b) => (ORDEN_ESTADO[a.estado] ?? 3) - (ORDEN_ESTADO[b.estado] ?? 3)
+      )
+      setVariables(ordenadas)
+      setCoberturas(res.coberturas || [])
       setAdvertencias(res.advertencias)
       setStep(2)
     } catch (e) {
@@ -82,7 +90,7 @@ export default function ProcesarPage() {
     )
     setGenerando(true)
     try {
-      const { blob, filename } = await generarCertificado(plantillaId, mapa)
+      const { blob, filename } = await generarCertificado(plantillaId, mapa, coberturas)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url; a.download = filename; a.click()
@@ -101,6 +109,25 @@ export default function ProcesarPage() {
         ? { ...v, valor, estado: valor ? 'ok' : 'falta', origen: 'manual' }
         : v
     ))
+  }
+
+  function updateCobertura(idx, campo, valor) {
+    setCoberturas(cs => cs.map((c, i) => i === idx ? { ...c, [campo]: valor } : c))
+  }
+
+  function quitarCobertura(idx) {
+    setCoberturas(cs => cs.filter((_, i) => i !== idx))
+  }
+
+  function agregarCobertura() {
+    // Nueva cobertura con los mismos sub-campos vacíos que las existentes
+    const campos = coberturas[0] ? Object.keys(coberturas[0]) : []
+    setCoberturas(cs => [...cs, Object.fromEntries(campos.map(k => [k, '']))])
+  }
+
+  // Etiqueta legible para un sub-campo (quita prefijo listado_ y guiones bajos)
+  function etiquetaCampo(campo) {
+    return campo.replace(/^listado_/, '').replace(/_/g, ' ')
   }
 
   const plantillaSeleccionada = plantillas.find(p => p.id === plantillaId)
@@ -217,9 +244,9 @@ export default function ProcesarPage() {
             </p>
 
             <div className={styles.varList}>
-              {[...variables]
-                .sort((a, b) => (ORDEN_ESTADO[a.estado] ?? 3) - (ORDEN_ESTADO[b.estado] ?? 3))
-                .map(v => (
+              {/* Orden fijo: ya se ordenó al cargar (pendientes primero). No
+                  reordenar aquí para que los campos no salten al escribir. */}
+              {variables.map(v => (
                 <div
                   key={v.nombre}
                   className={`${styles.varItem} ${esCampoLargo(v.valor) ? styles.varItemFull : ''}`}
@@ -242,6 +269,48 @@ export default function ProcesarPage() {
               ))}
             </div>
           </div>
+
+          {coberturas.length > 0 && (
+            <div className={styles.coberturasPanel}>
+              <div className={styles.panelHeader}>
+                <h2 className={styles.cardTitle}>Coberturas ({coberturas.length})</h2>
+                <Button variant="secondary" size="sm" onClick={agregarCobertura}>
+                  + Agregar cobertura
+                </Button>
+              </div>
+              <p className={styles.leyenda}>
+                Cada cobertura del cuadro de la póliza se incluye en el certificado.
+                Revisa, edita o elimina las que no correspondan.
+              </p>
+
+              <div className={styles.coberturasList}>
+                {coberturas.map((c, idx) => (
+                  <div key={idx} className={styles.coberturaCard}>
+                    <div className={styles.coberturaCardHeader}>
+                      <span className={styles.coberturaNum}>Cobertura {idx + 1}</span>
+                      <button
+                        className={styles.coberturaQuitar}
+                        onClick={() => quitarCobertura(idx)}
+                        title="Quitar esta cobertura"
+                      >✕ quitar</button>
+                    </div>
+                    {Object.keys(c).map(campo => (
+                      <label key={campo} className={styles.coberturaCampo}>
+                        <span className={styles.coberturaCampoLabel}>{etiquetaCampo(campo)}</span>
+                        <textarea
+                          className={styles.varInput}
+                          value={c[campo] || ''}
+                          rows={filasPara(c[campo])}
+                          onChange={e => updateCobertura(idx, campo, e.target.value)}
+                          placeholder="Campo vacío"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className={styles.reviewActions}>
             <Button variant="ghost" onClick={() => setStep(1)}>‹ Volver</Button>
